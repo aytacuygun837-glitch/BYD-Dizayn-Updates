@@ -1,5 +1,10 @@
 name: Publish app update metadata
 on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/make_release_feed.py
+      - .github/workflows/publish-update.yml
   release:
     types: [published]
   workflow_dispatch:
@@ -15,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || (!github.event.release.prerelease && !github.event.release.draft)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (!github.event.release.prerelease && !github.event.release.draft)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +30,10 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
           set -euo pipefail
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          fi
+          echo "SELECTED_RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
           mkdir -p release-files
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,name,body,isDraft,isPrerelease,assets > release.json
           python3 -c 'import json; r=json.load(open("release.json")); assert not r["isDraft"] and not r["isPrerelease"], "Only public stable-channel releases are accepted"'
@@ -45,5 +54,5 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
           set -euo pipefail
-          gh release upload "$RELEASE_TAG" latest.json --repo "$GITHUB_REPOSITORY" --clobber
-          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --latest
+          gh release upload "$SELECTED_RELEASE_TAG" latest.json --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$SELECTED_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --latest
