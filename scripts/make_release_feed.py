@@ -16,8 +16,8 @@ code=int(m[2]);name=m[3]
 minimum=re.search(r"sdkVersion:'(\d+)'",badging)
 if not minimum:raise SystemExit('Missing minimum SDK')
 verification=subprocess.check_output([a.apksigner,'verify','--print-certs',str(f)],text=True)
-certs=re.findall(r'Signer #\d+ certificate SHA-256 digest: ([a-fA-F0-9]+)',verification)
-if [c.lower() for c in certs]!=[CERT]:raise SystemExit('APK signing certificate differs from the distributed application')
+certs=re.findall(r'^(?:Signer #\d+|V\d+(?:\.\d+)? Signer):? certificate SHA-256 digest: ([a-fA-F0-9]{64})\s*$',verification,re.MULTILINE)
+if not certs or {c.lower() for c in certs}!={CERT}:raise SystemExit('APK signing certificate differs from the distributed application')
 assets=[x for x in r.get('assets',[]) if x.get('name')==f.name]
 if len(assets)!=1:raise SystemExit('Published APK asset not found')
 url=assets[0].get('url','');u=urlparse(url)
